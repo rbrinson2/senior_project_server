@@ -6,7 +6,6 @@ fn main() {
     let port_name = "/dev/ttyUSB0";
     let baud_rate = 115200;
     let test = "test";
-
     let nvidia = Command::new("nvidia-smi")
         .stdout(Stdio::piped())
         .output()
