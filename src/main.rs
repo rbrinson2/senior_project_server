@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 fn main() {
@@ -7,7 +7,10 @@ fn main() {
     let baud_rate = 115200;
     let test = "test";
 
-    let nvidia = Command::new("/bin/bash").arg("nvidia-smi").output();
+    let nvidia = Command::new("nvidia-smi")
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute nvidia-smi");
 
     let port = serialport::new(port_name, baud_rate)
         .timeout(Duration::from_millis(10))
@@ -24,8 +27,8 @@ fn main() {
                         let recieved = String::from_utf8_lossy(&serial_buf[..t]);
                         let trim = recieved.trim();
                         if test == trim {
-                            io::stdout().write_all(b"hello!\n").unwrap();
-                            io::stdout().write_all(&nvidia.stdout).unwrap();
+                            //io::stdout().write_all(b"hello!\n").unwrap();
+                            let _ = io::stdout().write_all(&nvidia.stdout);
                         }
                         io::stdout().write_all(&serial_buf[..t]).unwrap();
                         io::stdout().flush().unwrap();
