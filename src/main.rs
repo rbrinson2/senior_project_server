@@ -41,8 +41,6 @@ fn main() {
 
                         let cmd = parse_command(&recieved, &patterns);
                         execute_command(cmd);
-
-                        io::stdout().flush().unwrap();
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
                     Err(e) => eprintln!("{:?}", e),
@@ -70,7 +68,8 @@ fn execute_command(cmd: Command) {
             println!("Recieved test argument: {}", arg);
         }
         Command::Unknown(s) => {
-            println!("{}", s);
+            io::stdout().write_all(s.as_bytes()).unwrap();
+            io::stdout().flush().unwrap();
         }
     }
 }
@@ -90,7 +89,7 @@ fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
         return Command::Test(arg);
     }
 
-    Command::Unknown(trimmed.to_string())
+    Command::Unknown(line.to_string())
 }
 
 pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
