@@ -1,7 +1,8 @@
 [package]
-name = "com_test"
+name = "gpmu_server"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+regex = "1.12.2"
 serialport = "4.8.1"

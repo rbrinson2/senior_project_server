@@ -1,4 +1,7 @@
+use std::error::Error;
+use std::fs::OpenOptions;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -26,7 +29,6 @@ fn main() {
                         let recieved = String::from_utf8_lossy(&serial_buf[..t]);
                         let trim = recieved.trim();
                         if test == trim {
-                            //io::stdout().write_all(b"hello!\n").unwrap();
                             let _ = io::stdout().write_all(&nvidia.stdout);
                         }
                         io::stdout().write_all(&serial_buf[..t]).unwrap();
@@ -42,4 +44,34 @@ fn main() {
             ::std::process::exit(1);
         }
     }
+}
+
+pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
+    // You may need to adjust this path if your GPU uses card0 or hwmon0
+    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
+
+    // Check that the file exists
+    if !path.exists() {
+        return Err(format!("Path not found: {}", path.display()).into());
+    }
+
+    // Attempt to open the file for writing
+    let mut file = match OpenOptions::new().write(true).open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            return Err(format!(
+                "Failed to open {}: {} (try running as root with sudo)",
+                path.display(),
+                e
+            )
+            .into());
+        }
+    };
+
+    // Write the value
+    if let Err(e) = writeln!(file, "{}", value.trim()) {
+        return Err(format!("Failed to write power limit: {}", e).into());
+    }
+
+    Ok(())
 }
