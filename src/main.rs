@@ -1,18 +1,29 @@
+use regex::Regex;
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
 use std::time::Duration;
+
+enum Command {
+    PowerLimit(u32),
+    Test(String),
+    Unknown(String),
+}
+
+struct CommandPatterns {
+    power_limit: Regex,
+    test_cmd: Regex,
+}
 
 fn main() {
     let port_name = "/dev/ttyUSB0";
     let baud_rate = 115200;
-    let test = "test";
-    let nvidia = Command::new("nvidia-smi")
-        .stdout(Stdio::piped())
-        .output()
-        .expect("Failed to execute nvidia-smi");
+
+    let patterns = CommandPatterns {
+        power_limit: Regex::new(r"^powerLimit:\s*(\d)\s*$").unwrap(),
+        test_cmd: Regex::new(r"^test(?:\s+(.*))?$").unwrap(),
+    };
 
     let port = serialport::new(port_name, baud_rate)
         .timeout(Duration::from_millis(10))
@@ -27,11 +38,10 @@ fn main() {
                 match port.read(serial_buf.as_mut_slice()) {
                     Ok(t) => {
                         let recieved = String::from_utf8_lossy(&serial_buf[..t]);
-                        let trim = recieved.trim();
-                        if test == trim {
-                            let _ = io::stdout().write_all(&nvidia.stdout);
-                        }
-                        io::stdout().write_all(&serial_buf[..t]).unwrap();
+
+                        let cmd = parse_command(&recieved, &patterns);
+                        execute_command(cmd);
+
                         io::stdout().flush().unwrap();
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
@@ -44,6 +54,43 @@ fn main() {
             ::std::process::exit(1);
         }
     }
+}
+
+fn execute_command(cmd: Command) {
+    match cmd {
+        Command::PowerLimit(watts) => {
+            let microwatts = watts * 1_000_000;
+            println!("Setting GPU power limit to {} µW...", microwatts);
+            match set_gpu_power_limit(&microwatts.to_string()) {
+                Ok(_) => println!("Successfully set GPU power limit."),
+                Err(e) => eprintln!("Failed to set GPU power limit: {}", e),
+            }
+        }
+        Command::Test(arg) => {
+            println!("Recieved test argument: {}", arg);
+        }
+        Command::Unknown(s) => {
+            println!("{}", s);
+        }
+    }
+}
+fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
+    let trimmed = line.trim();
+    if let Some(caps) = pat.power_limit.captures(trimmed) {
+        if let Some(watts_str) = caps.get(1) {
+            if let Ok(watts) = watts_str.as_str().parse::<u32>() {
+                return Command::PowerLimit(watts);
+            }
+        }
+    } else if let Some(caps) = pat.test_cmd.captures(trimmed) {
+        let arg = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
+        return Command::Test(arg);
+    }
+
+    Command::Unknown(trimmed.to_string())
 }
 
 pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
