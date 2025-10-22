@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::error::Error;
 use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Duration;
 
@@ -91,8 +91,25 @@ fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
 
     Command::Unknown(line.to_string())
 }
-pub fn get_gpu_power_limit() -> u32 {
-    10
+pub fn get_gpu_power_limit() -> Result<String, Box<dyn Error>> {
+    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
+    if !path.exists() {
+        return Err(format!("Path not found: {}", path.display()).into());
+    }
+
+    let mut file = match OpenOptions::new().read(true).open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            return Err(format!(
+                "Failed to open {}: {} (try running as root with sudo)",
+                path.display(),
+                e
+            )
+            .into());
+        }
+    };
+
+    Ok("place holder".to_string())
 }
 pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
     // You may need to adjust this path if your GPU uses card0 or hwmon0
