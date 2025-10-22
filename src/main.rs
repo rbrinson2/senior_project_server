@@ -91,7 +91,9 @@ fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
 
     Command::Unknown(line.to_string())
 }
-
+pub fn get_gpu_power_limit() -> u32 {
+    10
+}
 pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
     // You may need to adjust this path if your GPU uses card0 or hwmon0
     let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
