@@ -1,18 +1,20 @@
 use regex::Regex;
 use std::error::Error;
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Duration;
 
 enum Command {
-    PowerLimit(u32),
+    SetPowerLimit(u32),
+    GetPowerLimit,
     Test(String),
     Unknown(String),
 }
 
 struct CommandPatterns {
-    power_limit: Regex,
+    set_power_limit: Regex,
+    get_power_limit: Regex,
     test_cmd: Regex,
 }
 
@@ -21,7 +23,8 @@ fn main() {
     let baud_rate = 115200;
 
     let patterns = CommandPatterns {
-        power_limit: Regex::new(r"^powerLimit:\s*(\d)\s*$").unwrap(),
+        set_power_limit: Regex::new(r"^setPowerLimit:\s*(\d)\s*$").unwrap(),
+        get_power_limit: Regex::new(r"^getPowerLimit$").unwrap(),
         test_cmd: Regex::new(r"^test(?:\s+(.*))?$").unwrap(),
     };
 
@@ -56,7 +59,7 @@ fn main() {
 
 fn execute_command(cmd: Command) {
     match cmd {
-        Command::PowerLimit(watts) => {
+        Command::SetPowerLimit(watts) => {
             let microwatts = watts * 1_000_000;
             println!("Setting GPU power limit to {} µW...", microwatts);
             match set_gpu_power_limit(&microwatts.to_string()) {
@@ -64,6 +67,7 @@ fn execute_command(cmd: Command) {
                 Err(e) => eprintln!("Failed to set GPU power limit: {}", e),
             }
         }
+        Command::GetPowerLimit => {}
         Command::Test(arg) => {
             println!("Recieved test argument: {}", arg);
         }
@@ -75,12 +79,14 @@ fn execute_command(cmd: Command) {
 }
 fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
     let trimmed = line.trim();
-    if let Some(caps) = pat.power_limit.captures(trimmed) {
+    if let Some(caps) = pat.set_power_limit.captures(trimmed) {
         if let Some(watts_str) = caps.get(1) {
             if let Ok(watts) = watts_str.as_str().parse::<u32>() {
-                return Command::PowerLimit(watts);
+                return Command::SetPowerLimit(watts);
             }
         }
+    } else if trimmed.eq_ignore_ascii_case(pat.get_power_limit.as_str()) {
+        return Command::GetPowerLimit;
     } else if let Some(caps) = pat.test_cmd.captures(trimmed) {
         let arg = caps
             .get(1)
@@ -97,19 +103,11 @@ pub fn get_gpu_power_limit() -> Result<String, Box<dyn Error>> {
         return Err(format!("Path not found: {}", path.display()).into());
     }
 
-    let mut file = match OpenOptions::new().read(true).open(path) {
-        Ok(f) => f,
-        Err(e) => {
-            return Err(format!(
-                "Failed to open {}: {} (try running as root with sudo)",
-                path.display(),
-                e
-            )
-            .into());
-        }
-    };
+    let power_cap = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
-    Ok("place holder".to_string())
+    // Trim any trailing newline and return
+    Ok(power_cap.trim().to_string())
 }
 pub fn set_gpu_power_limit(value: &str) -> Result<(), Box<dyn Error>> {
     // You may need to adjust this path if your GPU uses card0 or hwmon0
