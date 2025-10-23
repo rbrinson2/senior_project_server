@@ -5,6 +5,8 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Duration;
 
+const GPU_HWMON_BASE: &str = "/sys/class/drm/card1/device/hwmon/hwmon2";
+
 enum Command {
     SetPowerLimit(u32),
     GetPowerLimit,
@@ -136,45 +138,49 @@ fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
     Command::Unknown(line.to_string())
 }
 pub fn get_gpu_power_limit() -> Result<String, Box<dyn Error>> {
-    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
+    let path = Path::new(GPU_HWMON_BASE).join("power1_cap");
     if !path.exists() {
         return Err(format!("Path not found: {}", path.display()).into());
     }
 
-    let power_cap = fs::read_to_string(path)
+    let power_cap = fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
     // Trim any trailing newline and return
     Ok(power_cap.trim().to_string())
 }
+
 pub fn get_gpu_power_max() -> Result<String, Box<dyn Error>> {
-    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap_max");
+    let path = Path::new(GPU_HWMON_BASE).join("power1_cap_max");
     if !path.exists() {
         return Err(format!("Path not found: {}", path.display()).into());
     }
 
-    let power_max = fs::read_to_string(path)
+    let power_max = fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
     // Trim any trailing newline and return
     Ok(power_max.trim().to_string())
 }
+
 pub fn get_gpu_power_min() -> Result<String, Box<dyn Error>> {
-    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap_min");
+    let path = Path::new(GPU_HWMON_BASE).join("power1_cap_max");
     if !path.exists() {
         return Err(format!("Path not found: {}", path.display()).into());
     }
 
-    let power_min = fs::read_to_string(path)
+    let power_min = fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
     // Trim any trailing newline and return
     Ok(power_min.trim().to_string())
 }
+
 pub fn set_gpu_power_limit(value: u32) -> Result<(), Box<dyn Error>> {
     // println!("DEBUG: Entered set_gpu_power_limit");
     // You may need to adjust this path if your GPU uses card0 or hwmon0
-    let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
+    // let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
+    let path = Path::new(GPU_HWMON_BASE).join("power1_cap");
 
     // Check that the file exists
     if !path.exists() {
@@ -182,7 +188,7 @@ pub fn set_gpu_power_limit(value: u32) -> Result<(), Box<dyn Error>> {
     }
 
     // Attempt to open the file for writing
-    let mut file = match OpenOptions::new().write(true).open(path) {
+    let mut file = match OpenOptions::new().write(true).open(&path) {
         Ok(f) => f,
         Err(e) => {
             return Err(format!(
