@@ -27,7 +27,7 @@ fn main() {
     let baud_rate = 115200;
 
     let patterns = CommandPatterns {
-        set_power_limit: Regex::new(r"^setPowerLimit:\s*(\d)\s*$").unwrap(),
+        set_power_limit: Regex::new(r"^setPowerLimit:\s*([0-9]+)\s*$").unwrap(),
         get_power_limit: Regex::new(r"^getPowerLimit$").unwrap(),
         get_power_max: Regex::new(r"^getPowerMax$").unwrap(),
         get_power_min: Regex::new(r"^getPowerMin$").unwrap(),
@@ -47,6 +47,7 @@ fn main() {
                 match port.read(serial_buf.as_mut_slice()) {
                     Ok(t) => {
                         let recieved = String::from_utf8_lossy(&serial_buf[..t]);
+                        // println!("DEBUG: Recieved raw: {:?}", recieved);
 
                         let cmd = parse_command(&recieved, &patterns);
                         execute_command(cmd, &mut port);
@@ -108,6 +109,7 @@ fn execute_command(cmd: Command, port: &mut dyn Write) {
 }
 fn parse_command(line: &str, pat: &CommandPatterns) -> Command {
     let trimmed = line.trim();
+    // :println!("DEBUG: Trimmed raw: {:?}", trimmed);
     if let Some(caps) = pat.set_power_limit.captures(trimmed) {
         if let Some(watts_str) = caps.get(1) {
             if let Ok(watts) = watts_str.as_str().parse::<u32>() {
@@ -170,7 +172,7 @@ pub fn get_gpu_power_min() -> Result<String, Box<dyn Error>> {
     Ok(power_min.trim().to_string())
 }
 pub fn set_gpu_power_limit(value: u32) -> Result<(), Box<dyn Error>> {
-    println!("You made it this far");
+    // println!("DEBUG: Entered set_gpu_power_limit");
     // You may need to adjust this path if your GPU uses card0 or hwmon0
     let path = Path::new("/sys/class/drm/card1/device/hwmon/hwmon2/power1_cap");
 
@@ -193,9 +195,7 @@ pub fn set_gpu_power_limit(value: u32) -> Result<(), Box<dyn Error>> {
     };
 
     // Write the value
-    if let Err(e) = writeln!(file, "{}", value) {
-        return Err(format!("Failed to write power limit: {}", e).into());
-    }
+    _ = writeln!(file, "{}", value);
 
     Ok(())
 }
